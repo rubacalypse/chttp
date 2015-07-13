@@ -25,6 +25,9 @@ int bind_socket(int sock_fd, int port) {
   sock_addr->sin_addr.s_addr = htonl(INADDR_ANY);
   
   //still a bit confused when it comes to the difference between sockaddr and sockaddr_in
+  //stackoverflow says that sockaddr is a generic descriptor for any kind of
+  //socket operation
+  //both have "address family" as the first member
   int bind_rc = bind(sock_fd, (struct sockaddr *)sock_addr, sizeof(sock_addr));
   if (bind_rc < 0) {
     perror("error binding socket");
