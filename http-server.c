@@ -3,6 +3,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netinet/in.h>
+#include <unistd.h>
 
 int open_socket() {
   //SOCK_STREAM -> TCP/IP type of communication 
@@ -38,6 +39,23 @@ void listen_socket(int sock_fd, int num_connections) {
   }
 }
 
+int read_from_client(socket_fd) {
+  char buff[512];
+  int num_bytes = read(socket_fd, buff, 512);
+  printf("%s\r\n", buff);
+  if (num_bytes < 0) {
+    perror("error reading from client");
+    exit(1);
+  }
+  if (num_bytes == 0) {
+    perror("reached end-of-file");
+    exit(1);
+  }
+
+  printf("Well this is nice\r\n"); 
+  return 0;
+}
+
 void close_socket(int sock_fd) {
   if (close(sock_fd) < 0) {
     perror("error closing socket");
@@ -53,9 +71,16 @@ int main(int argc, char* argv[]) {
   bind_socket(sock_fd, port);
   listen_socket(sock_fd, 5);
   while(1) {
-    accept(sock_fd, (struct sockaddr*)&clien_addr, (socklen_t*)&clien_len);
-
+    int accept_socket_fd = accept(sock_fd, (struct sockaddr*)&clien_addr, (socklen_t*)&clien_len);
+    if (accept_socket_fd < 0) {
+      perror("error accepting connection");
+      exit(1);
+    }
+    int num_bytes = read_from_client(accept_socket_fd);
+    if (num_bytes == 0) {
+      close_socket(sock_fd);
+    }
   }
-  close_socket(sock_fd);
+  return 0;
 }
 
