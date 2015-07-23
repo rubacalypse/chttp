@@ -39,6 +39,18 @@ void listen_socket(int sock_fd, int num_connections) {
   }
 }
 
+
+int accept_connection(int sock_fd) {
+  struct sockaddr_in clien_addr;
+  int clien_len;
+  int accepted_socket_fd = accept(sock_fd, (struct sockaddr*)&clien_addr, (socklen_t*)&clien_len);
+  if (accepted_socket_fd < 0) {
+    perror("error accepting connection");
+    exit(1);
+  }
+  return accepted_socket_fd;
+}
+
 int read_from_client(socket_fd) {
   char buff[512];
   int num_bytes = read(socket_fd, buff, 512);
@@ -66,17 +78,11 @@ void close_socket(int sock_fd) {
 int main(int argc, char* argv[]) {
   int port = atoi(argv[1]);
   int sock_fd = open_socket();
-  struct sockaddr_in clien_addr;
-  int clien_len;
   bind_socket(sock_fd, port);
   listen_socket(sock_fd, 5);
   while(1) {
-    int accept_socket_fd = accept(sock_fd, (struct sockaddr*)&clien_addr, (socklen_t*)&clien_len);
-    if (accept_socket_fd < 0) {
-      perror("error accepting connection");
-      exit(1);
-    }
-    int num_bytes = read_from_client(accept_socket_fd);
+    int accepted_fd = accept_connection(sock_fd);
+    int num_bytes = read_from_client(accepted_fd);
     if (num_bytes == 0) {
       close_socket(sock_fd);
     }
