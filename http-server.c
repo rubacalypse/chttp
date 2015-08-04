@@ -4,6 +4,7 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <unistd.h>
+#include <string.h>
 
 int open_socket() {
   //SOCK_STREAM -> TCP/IP type of communication 
@@ -42,7 +43,10 @@ void listen_socket(int sock_fd, int num_connections) {
 
 int accept_connection(int sock_fd) {
   struct sockaddr_in clien_addr;
+  //haven't made up my mind over using memset here
+  //memset(&clien_addr, 0, sizeof(struct sockaddr_in));
   int clien_len;
+  printf("does clien_len have anything in it: %d\n", clien_len);
   int accepted_socket_fd = accept(sock_fd, (struct sockaddr*)&clien_addr, (socklen_t*)&clien_len);
   if (accepted_socket_fd < 0) {
     perror("error accepting connection");
@@ -51,7 +55,7 @@ int accept_connection(int sock_fd) {
   return accepted_socket_fd;
 }
 
-int read_from_client(socket_fd) {
+int read_from_client(int socket_fd) {
   char buff[512];
   int num_bytes = read(socket_fd, buff, 512);
   printf("%s\r\n", buff);
@@ -64,8 +68,8 @@ int read_from_client(socket_fd) {
     exit(1);
   }
 
-  printf("Well this is nice\r\n"); 
-  return 0;
+  printf("Well this is nice\r\n");
+  return num_bytes;
 }
 
 void close_socket(int sock_fd) {
@@ -82,7 +86,9 @@ int main(int argc, char* argv[]) {
   listen_socket(sock_fd, 5);
   while(1) {
     int accepted_fd = accept_connection(sock_fd);
+    printf("sock_fd: %d\naccepted socket: %d\n", sock_fd, accepted_fd);
     int num_bytes = read_from_client(accepted_fd);
+    printf("num bytes read from: %d\n", num_bytes);
     if (num_bytes == 0) {
       close_socket(sock_fd);
     }
