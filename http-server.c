@@ -46,7 +46,6 @@ int accept_connection(int sock_fd) {
   //haven't made up my mind over using memset here
   //memset(&clien_addr, 0, sizeof(struct sockaddr_in));
   int clien_len;
-  printf("does clien_len have anything in it: %d\n", clien_len);
   int accepted_socket_fd = accept(sock_fd, (struct sockaddr*)&clien_addr, (socklen_t*)&clien_len);
   if (accepted_socket_fd < 0) {
     perror("error accepting connection");
@@ -86,9 +85,7 @@ int main(int argc, char* argv[]) {
   listen_socket(sock_fd, 5);
   while(1) {
     int accepted_fd = accept_connection(sock_fd);
-    printf("sock_fd: %d\naccepted socket: %d\n", sock_fd, accepted_fd);
     int num_bytes = read_from_client(accepted_fd);
-    printf("num bytes read from: %d\n", num_bytes);
     if (num_bytes == 0) {
       close_socket(sock_fd);
     }
