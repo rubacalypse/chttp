@@ -1,10 +1,38 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <unistd.h>
-#include <string.h>
+
+char** parse_request(char* buff) {
+  //split into lines
+  //split lines into words
+  char** lines = malloc(50 * sizeof(char *));
+  int i = 0;
+  char* substr = strtok(buff, "\n");
+  lines[i] = substr;
+  while(substr != NULL){
+    i++;
+    substr = strtok(NULL, "\n");
+    lines[i] = substr;
+  }
+
+  //determine type of request from the first word of the message
+  //should probably do it in a more organized fashion
+  char* tok = strtok(lines[0], " ");
+  if(strcmp(tok, "GET") == 0) {
+    printf("oh hey GET request\n");
+  } else if (strcmp(tok, "HEAD") == 0) {
+    printf("oh hey HEAD request\n");
+  } else {
+    printf("I don't recognize anything\n");
+  }
+
+  return lines;
+}
+
 
 int open_socket() {
   //SOCK_STREAM -> TCP/IP type of communication 
@@ -58,6 +86,7 @@ int read_from_client(int socket_fd) {
   char buff[512];
   int num_bytes = read(socket_fd, buff, 512);
   printf("%s\r\n", buff);
+  
   if (num_bytes < 0) {
     perror("error reading from client");
     exit(1);
@@ -66,8 +95,6 @@ int read_from_client(int socket_fd) {
     perror("reached end-of-file");
     exit(1);
   }
-
-  printf("Well this is nice\r\n");
   return num_bytes;
 }
 
@@ -79,6 +106,8 @@ void close_socket(int sock_fd) {
 }
 
 int main(int argc, char* argv[]) {
+  char blorp[1000] = "HEAD /path/to/file HTTP/1.0\nfrom: bla\nto: blorp\n";
+  parse_request(blorp);
   int port = atoi(argv[1]);
   int sock_fd = open_socket();
   bind_socket(sock_fd, port);
