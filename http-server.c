@@ -6,10 +6,22 @@
 #include <netinet/in.h>
 #include <unistd.h>
 
-char** parse_request(char* buff) {
+
+int parse_get_request(char** body){
+  return 0;
+}
+
+int parse_head_request(char** body, int num_lines) {
+  for(int i = 0; i < num_lines; i++) {
+    printf("lines[%d]: %s\n", i, body[i]);
+  }
+  return 0;
+}
+
+int parse_request(char* buff) {
   //split into lines
   //split lines into words
-  char** lines = malloc(50 * sizeof(char *));
+  char** lines = calloc(50, sizeof(char *));
   int i = 0;
   char* substr = strtok(buff, "\n");
   lines[i] = substr;
@@ -19,20 +31,29 @@ char** parse_request(char* buff) {
     lines[i] = substr;
   }
 
-  //determine type of request from the first word of the message
-  //should probably do it in a more organized fashion
-  char* tok = strtok(lines[0], " ");
-  if(strcmp(tok, "GET") == 0) {
-    printf("oh hey GET request\n");
-  } else if (strcmp(tok, "HEAD") == 0) {
-    printf("oh hey HEAD request\n");
-  } else {
-    printf("I don't recognize anything\n");
+  //since strtok modifies its argument, I'm creating a copy of lines to figure
+  //out the type(GET, POST, HEAD) of request
+  char** str = calloc(50, sizeof(char *));
+  for (int x = 0; x < i; x++) {
+    str[x] = calloc(50, sizeof(char));
+    //strncpy(str[x], lines[x], sizeof(str));
+    strncpy(str[x], lines[x], 50 * sizeof(char));
   }
 
-  return lines;
+  //determine type of request from the first word of the message
+  //should probably do it in a more organized fashion
+  char* tok = strtok(str[0], " ");
+  if(strcmp(tok, "GET") == 0) {
+    parse_get_request(lines);
+  } else if (strcmp(tok, "HEAD") == 0) {
+    parse_head_request(lines, i);
+  } else {
+    perror("invalid request lol");
+    return 0;
+  }
+  printf("finished parsing\n");
+  return 1;
 }
-
 
 int open_socket() {
   //SOCK_STREAM -> TCP/IP type of communication 
