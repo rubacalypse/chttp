@@ -23,11 +23,10 @@ int parse_get_request(int sock_fd, char** body, int num_lines){
     i++;
     tok = strtok(NULL, " ");
     words[i] = tok;
-    //printf("words[%d]: %s\n", i, words[i]);
   }
 
   char* path = malloc(MAX_BYTES);
-  
+
   if(strncmp(words[1], "/", MAX_BYTES) == 0) {
     words[1] = "/Users/ruba/code/chttpd/index.html\0";
   } else {
@@ -66,12 +65,10 @@ int parse_get_request(int sock_fd, char** body, int num_lines){
   return rc;
 }
 
-int parse_head_request(char** body, int num_lines) {
+int parse_head_request(int sock_fd, char** body, int num_lines) {
   //TODO: figure out what to write back
   char* words[MAX_BYTES];
-  printf("body: %s\n", body[0]);
   char* tok = strtok(body[0], " ");
-  printf("%s\n", tok);
   int i = 0;
 
   words[i] = tok;
@@ -79,17 +76,25 @@ int parse_head_request(char** body, int num_lines) {
     i++;
     tok = strtok(NULL, " ");
     words[i] = tok;
-    printf("words: %s\n", words[i]);
   }
 
-  char* path = words[1];
+  char* path = malloc(MAX_BYTES);
+
+  if(strncmp(words[1], "/", MAX_BYTES) == 0) {
+    words[1] = "/Users/ruba/code/chttpd/index.html\0";
+  } else {
+    char abs_path[25] = "/Users/ruba/code/chttpd\0";
+    strncpy(path, abs_path, strlen(abs_path) + 1);
+  }
+
+  strcat(path,  words[1]);
+
   if(access(path, F_OK) != -1) {
-   //write to socket
-   // write("%s 200 OK\n", words[2]);
-   //Date:
-   //Server:
-   //Last-Modified:
-   //
+    char* response = malloc(MAX_BYTES);
+    FILE* file;
+    strncpy(response, words[2], strlen(words[2] + 1));
+    strcat(response, " 200 OK\n\0");
+    write(sock_fd, response, strlen(response));
    
   } else {
     printf("%s 404 File Not Found\n", words[2]);
@@ -100,12 +105,6 @@ int parse_head_request(char** body, int num_lines) {
 
 int parse_request(char* buff, int sock_fd) {
   //TODO: fix the order of the read_from_client, parse_request.. functions
-  //split into lines
-  //split lines into words
-  //50 is a stupid magic number
-  //proper use of calloc?  
-  //counting the number of lines in buff
-  //making a copy of it so I can strtok it later (strtok modifies it)
   char* buff_copy = calloc(1, MAX_BYTES);
   strncpy(buff_copy, buff, MAX_BYTES);
   int num_lines = 0;
@@ -143,7 +142,7 @@ int parse_request(char* buff, int sock_fd) {
       return 0;
     }
   } else if (strcmp(tok, "HEAD") == 0) {
-    parse_head_request(lines, num_lines);
+    parse_head_request(sock_fd, lines, num_lines);
   } else {
     perror("invalid request lol");
     return 0;
