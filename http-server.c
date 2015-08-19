@@ -6,22 +6,116 @@
 #include <netinet/in.h>
 #include <unistd.h>
 
+//max number of bytes for words
+#define MAX_BYTES 100
 
-int parse_get_request(char** body){
-  return 0;
+
+int parse_get_request(int sock_fd, char** body, int num_lines){
+  //TODO: deal with resource path
+  int rc;
+  char* words[MAX_BYTES];
+  
+  char* tok = strtok(body[0], " ");
+  int i = 0;
+
+  words[i] = tok;
+  while(tok != NULL) {
+    i++;
+    tok = strtok(NULL, " ");
+    words[i] = tok;
+    //printf("words[%d]: %s\n", i, words[i]);
+  }
+
+  char* path = malloc(MAX_BYTES);
+  
+  if(strncmp(words[1], "/", MAX_BYTES) == 0) {
+    words[1] = "/Users/ruba/code/chttpd/index.html\0";
+  } else {
+    char abs_path[25] = "/Users/ruba/code/chttpd\0";
+    strncpy(path, abs_path, strlen(abs_path) + 1);
+  }
+
+  strcat(path,  words[1]);
+
+  if(access(path, F_OK) != -1) {
+    char* response = malloc(MAX_BYTES);
+    FILE* file;
+    strncpy(response, words[2], strlen(words[2] + 1));
+    strcat(response, " 200 OK\n\0");
+    file = fopen(path, "r");
+    char** text = malloc(MAX_BYTES);
+    if(file) {
+      char* line = NULL;
+      size_t linecap = 0;
+      ssize_t linelen = 0;
+      while((linelen = getline(&line, &linecap, file)) > 0) {
+        *text = calloc(MAX_BYTES, MAX_BYTES);
+        strncpy(*text, line, MAX_BYTES);
+        strcat(response, *text);
+      }
+    } else {
+      perror("error opening file!");
+    }
+
+    write(sock_fd, response, strlen(response));
+    rc = 1;
+  } else {
+    printf("%s 404 File Not Found\n", words[2]);
+    rc = 0;
+  }
+  return rc;
 }
 
 int parse_head_request(char** body, int num_lines) {
-  for(int i = 0; i < num_lines; i++) {
-    printf("lines[%d]: %s\n", i, body[i]);
+  //TODO: figure out what to write back
+  char* words[MAX_BYTES];
+  printf("body: %s\n", body[0]);
+  char* tok = strtok(body[0], " ");
+  printf("%s\n", tok);
+  int i = 0;
+
+  words[i] = tok;
+  while(tok != NULL) {
+    i++;
+    tok = strtok(NULL, " ");
+    words[i] = tok;
+    printf("words: %s\n", words[i]);
   }
+
+  char* path = words[1];
+  if(access(path, F_OK) != -1) {
+   //write to socket
+   // write("%s 200 OK\n", words[2]);
+   //Date:
+   //Server:
+   //Last-Modified:
+   //
+   
+  } else {
+    printf("%s 404 File Not Found\n", words[2]);
+  }
+  
   return 0;
 }
 
-int parse_request(char* buff) {
+int parse_request(char* buff, int sock_fd) {
+  //TODO: fix the order of the read_from_client, parse_request.. functions
   //split into lines
   //split lines into words
-  char** lines = calloc(50, sizeof(char *));
+  //50 is a stupid magic number
+  //proper use of calloc?  
+  //counting the number of lines in buff
+  //making a copy of it so I can strtok it later (strtok modifies it)
+  char* buff_copy = calloc(1, MAX_BYTES);
+  strncpy(buff_copy, buff, MAX_BYTES);
+  int num_lines = 0;
+  char* newline = strtok(buff_copy, "\n");
+  while(newline != NULL) {
+   num_lines +=1;
+   newline = strtok(NULL, "\n");
+  }
+  
+  char** lines = calloc(num_lines, sizeof(char *));
   int i = 0;
   char* substr = strtok(buff, "\n");
   lines[i] = substr;
@@ -33,20 +127,23 @@ int parse_request(char* buff) {
 
   //since strtok modifies its argument, I'm creating a copy of lines to figure
   //out the type(GET, POST, HEAD) of request
-  char** str = calloc(50, sizeof(char *));
+  char** str = calloc(num_lines, sizeof(char *));
   for (int x = 0; x < i; x++) {
-    str[x] = calloc(50, sizeof(char));
-    //strncpy(str[x], lines[x], sizeof(str));
-    strncpy(str[x], lines[x], 50 * sizeof(char));
+    str[x] = calloc(MAX_BYTES, sizeof(char));
+    strncpy(str[x], lines[x], MAX_BYTES * sizeof(char));
   }
 
   //determine type of request from the first word of the message
   //should probably do it in a more organized fashion
   char* tok = strtok(str[0], " ");
   if(strcmp(tok, "GET") == 0) {
-    parse_get_request(lines);
+    if(parse_get_request(sock_fd, lines, num_lines)) {
+      return 1;
+    } else {
+      return 0;
+    }
   } else if (strcmp(tok, "HEAD") == 0) {
-    parse_head_request(lines, i);
+    parse_head_request(lines, num_lines);
   } else {
     perror("invalid request lol");
     return 0;
@@ -116,6 +213,8 @@ int read_from_client(int socket_fd) {
     perror("reached end-of-file");
     exit(1);
   }
+
+  parse_request(buff, socket_fd);
   return num_bytes;
 }
 
@@ -127,8 +226,8 @@ void close_socket(int sock_fd) {
 }
 
 int main(int argc, char* argv[]) {
-  char blorp[1000] = "HEAD /path/to/file HTTP/1.0\nfrom: bla\nto: blorp\n";
-  parse_request(blorp);
+  //char blorp[1000] = "HEAD /path/to/file HTTP/1.0\nfrom: bla\nto: blorp\n";
+  //parse_request(blorp);
   int port = atoi(argv[1]);
   int sock_fd = open_socket();
   bind_socket(sock_fd, port);
