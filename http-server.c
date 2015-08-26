@@ -7,6 +7,7 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <sys/param.h>
 
 //max number of bytes for words
 #define SIZE 100
@@ -25,17 +26,18 @@ int parse_get_request(int sock_fd, char** body, int num_lines){
     words[i] = tok;
   }
 
-  //get the path from that line
+  //construct the path
   char* path = malloc(SIZE);
-
+  char abs_path[SIZE];
+  char* server_root = getcwd(abs_path, SIZE);
+  strncpy(path, server_root, SIZE);
+  
   if(strncmp(words[1], "/", SIZE) == 0) {
-    words[1] = "/Users/ruba/code/chttpd/index.html\0";
+    strcat(path, "/index.html");
   } else {
-    char abs_path[25] = "/Users/ruba/code/chttpd\0";
-    strncpy(path, abs_path, strlen(abs_path) + 1);
+    strcat(path, words[1]);
   }
 
-  strcat(path,  words[1]);
 
   //check if resource exists
   char* response = malloc(SIZE);
@@ -58,7 +60,6 @@ int parse_get_request(int sock_fd, char** body, int num_lines){
     } else {
       perror("error opening file!");
     }
-
     rc = 1;
   } else {
     strncpy(response, words[2], strlen(words[2] + 1));
@@ -66,8 +67,7 @@ int parse_get_request(int sock_fd, char** body, int num_lines){
     printf("%s 404 File Not Found\n", words[2]);
     rc = 0;
   }
-
-  write(sock_fd, response, strlen(response));
+  write(sock_fd, response, strlen(response) + 1);
   return rc;
 }
 
@@ -77,7 +77,6 @@ int parse_head_request(int sock_fd, char** body, int num_lines) {
   char* tok = strtok(body[0], " ");
   int i = 0;
   int rc = 0;
-
   words[i] = tok;
   while(tok != NULL) {
     i++;
@@ -85,18 +84,18 @@ int parse_head_request(int sock_fd, char** body, int num_lines) {
     words[i] = tok;
   }
 
-  //store the path in relation to where chttpd lives
   char* path = malloc(SIZE);
+  char abs_path[SIZE];
+  char* server_root = getcwd(abs_path, SIZE);
+  strncpy(path, server_root, SIZE);
+  
   if(strncmp(words[1], "/", SIZE) == 0) {
-    words[1] = "/Users/ruba/code/chttpd/index.html\0";
+    strcat(path, "/index.html");
   } else {
-    char abs_path[25] = "/Users/ruba/code/chttpd\0";
-    strncpy(path, abs_path, strlen(abs_path) + 1);
+    strcat(path, words[1]);
   }
-  strcat(path,  words[1]);
-  //write: DATE: content-type:text/html content-length 
-  char* response = malloc(SIZE);
 
+  char* response = malloc(SIZE);
   if(access(path, F_OK) != -1) {
     //get current time and date
     time_t current_time = time(NULL);
@@ -104,13 +103,11 @@ int parse_head_request(int sock_fd, char** body, int num_lines) {
       fprintf(stderr, "error computing time\n");
       return 0;
     }
-    
     struct tm* local_time = localtime(&current_time);
     if(local_time == NULL) {
       fprintf(stderr, "error converting time\n");
       return 0;
     }
-
     char buff[SIZE];
     strftime(buff, SIZE, "Date: %A, %d %B %Y %T %Z\n", local_time);
    
@@ -121,10 +118,9 @@ int parse_head_request(int sock_fd, char** body, int num_lines) {
       fprintf(stderr, "error getting file attribs\n");
       return 0;
     }
-
     char date[SIZE];
     struct tm* access_time = localtime(&(attribs.st_atime));
-    strftime(date, SIZE, "Last accessed:%A, %d %B %Y %T %Z\n", access_time);
+    strftime(date, SIZE, "Last accessed: %A, %d %B %Y %T %Z\n", access_time);
     
     //print status line as 200 OK
     strncpy(response, words[2], strlen(words[2] + 1));
@@ -266,8 +262,6 @@ void close_socket(int sock_fd) {
 }
 
 int main(int argc, char* argv[]) {
-  //char blorp[1000] = "HEAD /path/to/file HTTP/1.0\nfrom: bla\nto: blorp\n";
-  //parse_request(blorp);
   int port = atoi(argv[1]);
   int sock_fd = open_socket();
   bind_socket(sock_fd, port);
