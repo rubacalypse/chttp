@@ -18,7 +18,6 @@ int parse_get_request(int sock_fd, char** body, int num_lines){
   char* words[SIZE];
   char* tok = strtok(body[0], " ");
   int i = 0;
-
   words[i] = tok;
   while(tok != NULL) {
     i++;
@@ -31,7 +30,6 @@ int parse_get_request(int sock_fd, char** body, int num_lines){
   char abs_path[SIZE];
   char* server_root = getcwd(abs_path, SIZE);
   strncpy(path, server_root, SIZE);
-  
   if(strncmp(words[1], "/", SIZE) == 0) {
     strcat(path, "/index.html");
   } else {
@@ -43,7 +41,7 @@ int parse_get_request(int sock_fd, char** body, int num_lines){
   char* response = malloc(SIZE);
   if(access(path, F_OK) != -1) {
     strncpy(response, words[2], strlen(words[2] + 1));
-    strcat(response, " 200 OK\n\0");
+    strcat(response, " 200 OK\n\n\0");
     //open file to extract lines 
     FILE* file;
     file = fopen(path, "r");
@@ -83,19 +81,18 @@ int parse_head_request(int sock_fd, char** body, int num_lines) {
     tok = strtok(NULL, " ");
     words[i] = tok;
   }
-
+  //construct path
   char* path = malloc(SIZE);
   char abs_path[SIZE];
   char* server_root = getcwd(abs_path, SIZE);
   strncpy(path, server_root, SIZE);
-  
   if(strncmp(words[1], "/", SIZE) == 0) {
     strcat(path, "/index.html");
   } else {
     strcat(path, words[1]);
   }
-
-  char* response = malloc(SIZE);
+  //check if resource exists
+  char* response = malloc(SIZE * 5);
   if(access(path, F_OK) != -1) {
     //get current time and date
     time_t current_time = time(NULL);
@@ -109,7 +106,7 @@ int parse_head_request(int sock_fd, char** body, int num_lines) {
       return 0;
     }
     char buff[SIZE];
-    strftime(buff, SIZE, "Date: %A, %d %B %Y %T %Z\n", local_time);
+    strftime(buff, SIZE, "Date: %A, %d %B %Y %T %Z\n\0", local_time);
    
     //get file information 
     struct stat attribs;
@@ -120,14 +117,22 @@ int parse_head_request(int sock_fd, char** body, int num_lines) {
     }
     char date[SIZE];
     struct tm* access_time = localtime(&(attribs.st_atime));
-    strftime(date, SIZE, "Last accessed: %A, %d %B %Y %T %Z\n", access_time);
+    strftime(date, SIZE, "Last accessed: %A, %d %B %Y %T %Z\n\0", access_time);
+   
+    off_t size = attribs.st_size;
+    printf("size: %lld\n", size);
+    
+    char content_length[SIZE] = "Content-Length: \0";
     
     //print status line as 200 OK
     strncpy(response, words[2], strlen(words[2] + 1));
-    strcat(response, " 200 OK\nDate: \0");
+    strcat(response, " 200 OK\n\0");
     strcat(response, buff);
     strcat(response, date);
-
+    strcat(response, content_length);
+    char size_str[8];
+    snprintf(size_str, 8, "%lld\n", size);
+    strcat(response, size_str);
     rc = 1;
   } else {
     strncpy(response, words[2], strlen(words[2] + 1));
@@ -135,6 +140,7 @@ int parse_head_request(int sock_fd, char** body, int num_lines) {
     printf("%s 404 Not Found\n", words[2]);
     rc = 0;
   }
+  printf("strlen: %lu\n", strlen(response));
   
   write(sock_fd, response, strlen(response));
   return rc;
