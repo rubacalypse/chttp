@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/param.h>
+#include <sys/select.h>
 
 //max number of bytes for words
 #define SIZE 100
@@ -120,7 +121,6 @@ int parse_head_request(int sock_fd, char** body, int num_lines) {
     strftime(date, SIZE, "Last accessed: %A, %d %B %Y %T %Z\n\0", access_time);
    
     off_t size = attribs.st_size;
-    printf("size: %lld\n", size);
     
     char content_length[SIZE] = "Content-Length: \0";
     
@@ -140,7 +140,6 @@ int parse_head_request(int sock_fd, char** body, int num_lines) {
     printf("%s 404 Not Found\n", words[2]);
     rc = 0;
   }
-  printf("strlen: %lu\n", strlen(response));
   
   write(sock_fd, response, strlen(response));
   return rc;
@@ -197,7 +196,6 @@ int parse_request(char* buff, int sock_fd) {
 int open_socket() {
   //SOCK_STREAM -> TCP/IP type of communication 
   int sock_fd = socket(PF_INET, SOCK_STREAM, 0);
-  
   if (sock_fd < 0) {
     perror("error opening socket");
     exit(1);
@@ -252,8 +250,7 @@ int read_from_client(int socket_fd) {
     exit(1);
   }
   if (num_bytes == 0) {
-    perror("reached end-of-file");
-    exit(1);
+    return -1;
   }
 
   parse_request(buff, socket_fd);
@@ -268,15 +265,33 @@ void close_socket(int sock_fd) {
 }
 
 int main(int argc, char* argv[]) {
+  fd_set active_set, read_set; 
   int port = atoi(argv[1]);
   int sock_fd = open_socket();
   bind_socket(sock_fd, port);
   listen_socket(sock_fd, 5);
+  FD_ZERO(&active_set);
+  FD_SET(sock_fd, &active_set);
+
   while(1) {
-    int accepted_fd = accept_connection(sock_fd);
-    int num_bytes = read_from_client(accepted_fd);
-    if (num_bytes == 0) {
-      close_socket(sock_fd);
+    read_set = active_set;
+    if (select(FD_SETSIZE, &read_set, NULL, NULL, NULL) < 0) {
+      perror("select error");
+      exit(EXIT_FAILURE);
+    }
+
+    for (int i = 0; i < FD_SETSIZE; i++) {
+      if (FD_ISSET(i, &read_set)) {
+        if (i == sock_fd) {
+          int accepted_fd = accept_connection(sock_fd);
+          FD_SET(accepted_fd, &active_set);
+        } else {
+          if (read_from_client(i) < 0) {
+            close_socket(i);
+            FD_CLR(i, &active_set);
+          }
+        }
+      }
     }
   }
   return 0;
